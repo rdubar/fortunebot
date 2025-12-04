@@ -4,8 +4,8 @@ AI-powered take on the classic Unix `fortune`: short, funny fortunes generated o
 
 ## Setup
 - Go 1.21+.
-- Copy `examples/fortunebot.env.example` → `fortunebot.env` and set `OPENAI_API_KEY` (and optional `OPENAI_MODEL`).
-  - The binary reads `fortunebot.env` next to the executable or in the current directory.
+- If you already export `OPENAI_API_KEY` (or `FORTUNEBOT_API_KEY`) in your shell, you can skip the env file.
+- Otherwise copy `examples/fortunebot.env.example` → `fortunebot.env` and set `OPENAI_API_KEY` (and optional `OPENAI_MODEL`). The binary reads `fortunebot.env` next to the executable or in the current directory.
 - Optional: copy `examples/config.example.json` → `config.json` (gitignored) for non-secret defaults (prompt/model). Prefer the env file for secrets.
 - Build: `go build -o fortunebot ./cmd/fortunebot` or `make build`
 - Install to `~/.local/bin` (no sudo): `make install` (ensure `~/.local/bin` is on your `PATH`)
