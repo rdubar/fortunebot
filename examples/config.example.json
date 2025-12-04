@@ -1,0 +1,5 @@
+{
+  "api_key": "",
+  "default_prompt": "Generate a very short, funny fortune cookie message about AI, programmers, or neural networks. Maximum 2 short sentences.",
+  "model": "gpt-4o-mini"
+}

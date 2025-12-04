@@ -1,0 +1,7 @@
+!cmd/        # the go code
+/fortunebot  # compiled Go binary at repo root
+fortunebot.env
+config.json
+fortunebot.log
+__pycache__/ 
+.DS_Store
