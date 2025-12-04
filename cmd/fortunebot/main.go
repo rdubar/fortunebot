@@ -155,6 +155,20 @@ func resolveModelWithSource(cli string, cfg config) (string, string) {
 	return defaultModel, "built-in default"
 }
 
+// resolvePromptWithSource resolves the prompt and explains where it came from.
+func resolvePromptWithSource(cli string, cfg config) (string, string) {
+	if strings.TrimSpace(cli) != "" {
+		return cli, "--prompt flag"
+	}
+	if v := os.Getenv("FORTUNEBOT_PROMPT"); v != "" {
+		return v, "env FORTUNEBOT_PROMPT"
+	}
+	if strings.TrimSpace(cfg.DefaultPrompt) != "" {
+		return cfg.DefaultPrompt, "~/.config/fortunebot/config.json"
+	}
+	return defaultPrompt, "built-in default"
+}
+
 // isErrorFortune detects cached error strings (we skip caching/logging them).
 func isErrorFortune(s string) bool {
 	return strings.HasPrefix(strings.TrimSpace(s), "[fortunebot]")
@@ -401,7 +415,7 @@ func main() {
 	verbose := *flagVerbose && !*flagQuiet
 
 	if *flagPrefetchWork {
-		prompt := firstNonEmpty(*flagPrompt, cfg.DefaultPrompt, defaultPrompt)
+		prompt, _ := resolvePromptWithSource(*flagPrompt, cfg)
 		apiKey, _ := resolveAPIKeyWithSource(*flagAPIKey, cfg)
 		model, _ := resolveModelWithSource(*flagModel, cfg)
 		os.Exit(runPrefetchWorker(prompt, apiKey, model))
@@ -429,11 +443,12 @@ func main() {
 		clearCache()
 	}
 
-	prompt := firstNonEmpty(*flagPrompt, cfg.DefaultPrompt, defaultPrompt)
+	prompt, promptSrc := resolvePromptWithSource(*flagPrompt, cfg)
 	apiKey, apiSrc := resolveAPIKeyWithSource(*flagAPIKey, cfg)
 	model, modelSrc := resolveModelWithSource(*flagModel, cfg)
 
 	if verbose {
+		fmt.Printf("[fortunebot] Using prompt (source: %s)\n", promptSrc)
 		fmt.Printf("[fortunebot] Using model: %s (source: %s)\n", model, modelSrc)
 		if apiKey != "" {
 			fmt.Printf("[fortunebot] Using API key from: %s (%s)\n", apiSrc, maskKey(apiKey))

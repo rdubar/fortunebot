@@ -3,12 +3,30 @@
 AI-powered take on the classic Unix `fortune`: short, funny fortunes generated on the fly via the OpenAI Responses API.
 
 ## Setup
-- Go 1.21+.
-- If you already export `OPENAI_API_KEY` (or `FORTUNEBOT_API_KEY`) in your shell, you can skip the env file.
-- Otherwise copy `examples/fortunebot.env.example` → `fortunebot.env` and set `OPENAI_API_KEY` (and optional `OPENAI_MODEL`). The binary reads `fortunebot.env` next to the executable or in the current directory.
-- Optional: copy `examples/config.example.json` → `config.json` (gitignored) for non-secret defaults (prompt/model). Prefer the env file for secrets.
+Requires Go 1.21+.
+
+Quick start (uses your existing `OPENAI_API_KEY`/`FORTUNEBOT_API_KEY` if set):
+```bash
+gh repo clone rdubar/fortunebot
+cd fortunebot
+make install   # builds and copies to ~/.local/bin/fortunebot
+fortunebot     # prints a fortune
+```
+
+If you don’t export a key already, create an env file next to the binary:
+```bash
+cp examples/fortunebot.env.example fortunebot.env
+nano fortunebot.env   # set OPENAI_API_KEY=sk-...
+```
+Then re-run `fortunebot`.
+
+Tip: each run prefetches the next fortune in the background, so subsequent runs are instant. `fortunebot -r` shows a random fortune from the log without calling the API.
+
+## Optional extras
+- Optional prompt override: set `FORTUNEBOT_PROMPT` in the env file (or export it) to change the fortune style without CLI flags.
+- Copy `examples/config.example.json` → `config.json` for non-secret defaults (prompt/model). Keep secrets in the env file.
 - Build: `go build -o fortunebot ./cmd/fortunebot` or `make build`
-- Install to `~/.local/bin` (no sudo): `make install` (ensure `~/.local/bin` is on your `PATH`)
+- Install to `~/.local/bin` (no sudo): `make install` (ensure `~/.local/bin` is on your PATH)
 - Run without building: `go run ./cmd/fortunebot`
 
 ## How config is resolved
