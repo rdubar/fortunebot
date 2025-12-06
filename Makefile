@@ -1,6 +1,6 @@
 APP_NAME := fortunebot
 
-.PHONY: build run clean
+.PHONY: build run clean uninstall
 
 build:
 	GO111MODULE=on go build -o $(APP_NAME) ./cmd/fortunebot
@@ -15,3 +15,7 @@ install: build
 
 clean:
 	rm -f $(APP_NAME)
+
+uninstall:
+	rm -f ~/.local/bin/$(APP_NAME)
+	@echo "Removed ~/.local/bin/$(APP_NAME). User config/log/cache left untouched."

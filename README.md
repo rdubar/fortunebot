@@ -28,6 +28,7 @@ Tip: each run prefetches the next fortune in the background, so subsequent runs 
 - Copy `examples/config.example.json` → `config.json` for non-secret defaults (prompt/model). Keep secrets in the env file.
 - Build: `go build -o fortunebot ./cmd/fortunebot` or `make build`
 - Install to `~/.local/bin` (no sudo): `make install` (ensure `~/.local/bin` is on your PATH)
+- Uninstall the installed binary (leaves config/cache/logs intact): `make uninstall`
 - Run without building: `go run ./cmd/fortunebot`
 
 ## How config is resolved
