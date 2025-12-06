@@ -58,13 +58,34 @@ func defaultLogPath() string {
 	return "fortunebot.log"
 }
 
-// loadDotEnv loads a fortunebot.env file from the executable directory or CWD.
+// loadDotEnv loads a fortunebot.env file from common locations.
 func loadDotEnv() {
 	paths := []string{}
-	if exe, err := os.Executable(); err == nil {
-		paths = append(paths, filepath.Join(filepath.Dir(exe), "fortunebot.env"))
+	seen := map[string]bool{}
+	add := func(p string) {
+		if strings.TrimSpace(p) == "" {
+			return
+		}
+		if seen[p] {
+			return
+		}
+		seen[p] = true
+		paths = append(paths, p)
 	}
-	paths = append(paths, "fortunebot.env")
+
+	if custom := os.Getenv("FORTUNEBOT_ENV"); custom != "" {
+		add(custom)
+	}
+	if exe, err := os.Executable(); err == nil {
+		add(filepath.Join(filepath.Dir(exe), "fortunebot.env"))
+	}
+	if cwd, err := os.Getwd(); err == nil {
+		add(filepath.Join(cwd, "fortunebot.env"))
+	} else {
+		add("fortunebot.env")
+	}
+	add(filepath.Join(filepath.Dir(configPath), "fortunebot.env"))
+	add("fortunebot.env")
 
 	for _, p := range paths {
 		if err := applyEnvFile(p); err == nil {

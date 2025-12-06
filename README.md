@@ -13,10 +13,11 @@ make install   # builds and copies to ~/.local/bin/fortunebot
 fortunebot     # prints a fortune
 ```
 
-If you don’t export a key already, create an env file next to the binary:
+If you don’t export a key already, create an env file at the standard location `~/.config/fortunebot/fortunebot.env`:
 ```bash
-cp examples/fortunebot.env.example fortunebot.env
-nano fortunebot.env   # set OPENAI_API_KEY=sk-...
+mkdir -p ~/.config/fortunebot
+cp examples/fortunebot.env.example ~/.config/fortunebot/fortunebot.env
+nano ~/.config/fortunebot/fortunebot.env   # set OPENAI_API_KEY=sk-...
 ```
 Then re-run `fortunebot`.
 
@@ -31,7 +32,7 @@ Tip: each run prefetches the next fortune in the background, so subsequent runs 
 
 ## How config is resolved
 1) CLI flags (`--api-key`, `--prompt`, `--cache-ttl`, etc.)
-2) Environment variables / `fortunebot.env`: `FORTUNEBOT_API_KEY` or `OPENAI_API_KEY`; `FORTUNEBOT_MODEL` or `OPENAI_MODEL`.
+2) Environment variables / `fortunebot.env`: standard location is `~/.config/fortunebot/fortunebot.env` (recommended). You can also set `FORTUNEBOT_ENV=/path/to/fortunebot.env` to point elsewhere. Keys: `FORTUNEBOT_API_KEY` or `OPENAI_API_KEY`; `FORTUNEBOT_MODEL` or `OPENAI_MODEL`.
 3) `~/.config/fortunebot/config.json` (or local `config.json` if you choose).
 4) Built-in defaults (`gpt-4o-mini`, short fortune prompt).
 
