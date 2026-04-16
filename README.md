@@ -151,7 +151,7 @@ Issues and PRs welcome. The Go CLI in `cmd/fortunebot/` is the sole entry point 
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+[The Unlicense](LICENSE) — public domain. No attribution required. Use it however you like.
 
 ## Author
 
