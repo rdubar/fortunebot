@@ -140,4 +140,4 @@ MIT — see [LICENSE](LICENSE).
 
 **Roger Dubar** — [rdubar@gmail.com](mailto:rdubar@gmail.com) — [github.com/rdubar](https://github.com/rdubar)
 
-Coding assistance: [Claude Code](https://claude.ai/code) (Anthropic) and OpenAI Codex.
+Coding assistance: [Claude Code](https://claude.ai/code) (Anthropic) and [OpenAI Codex](https://openai.com/codex).
