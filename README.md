@@ -1,6 +1,6 @@
 # fortunebot
 
-An AI-powered take on the classic Unix `fortune` command. Generates short, witty fortunes via the OpenAI API and delivers them instantly — every time — thanks to a stale-while-revalidate cache with background prefetching.
+An AI-powered take on the classic Unix `fortune` command. Generates short, witty fortunes via the OpenAI or Anthropic API and delivers them instantly — every time — thanks to a stale-while-revalidate cache with background prefetching.
 
 Built in Go with zero external dependencies.
 
@@ -18,11 +18,11 @@ Built in Go with zero external dependencies.
 
 ```bash
 go install github.com/rdubar/fortunebot/cmd/fortunebot@latest
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY=sk-...      # or ANTHROPIC_API_KEY=sk-ant-...
 fortunebot
 ```
 
-> Output: `🤖 "Your next best friend might just be a neural network — just don't ask it to borrow money!"`
+> `🤖 "Your next best friend might just be a neural network — just don't ask it to borrow money!"`
 
 ## Installation
 
@@ -47,15 +47,15 @@ export PATH="$HOME/.local/bin:$PATH"   # add to ~/.zshrc
 
 ## API key setup
 
-If `OPENAI_API_KEY` isn't already in your environment, create a local env file:
+If your API key isn't already exported, create a local env file:
 
 ```bash
 mkdir -p ~/.config/fortunebot
 cp examples/fortunebot.env.example ~/.config/fortunebot/fortunebot.env
-$EDITOR ~/.config/fortunebot/fortunebot.env   # set OPENAI_API_KEY=sk-...
+$EDITOR ~/.config/fortunebot/fortunebot.env
 ```
 
-fortunebot picks this up automatically on startup. Keys in the env file take precedence over `config.json`.
+Set `OPENAI_API_KEY` for OpenAI, or `ANTHROPIC_API_KEY` for Claude. fortunebot picks this up automatically on startup.
 
 ## Usage
 
@@ -65,37 +65,54 @@ fortunebot [flags]
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--verbose` | off | Show config sources, cache state, and prefetch status |
+| `--provider NAME` | auto | API provider: `openai` or `anthropic` (auto-detected from model name) |
+| `--model NAME` | provider default | Model to use (e.g. `gpt-4o-mini`, `claude-haiku-4-5-20251001`) |
+| `--api-key KEY` | — | API key for the active provider (prefer env var instead) |
+| `--prompt TEXT` | built-in | Override the fortune prompt |
+| `--verbose` | off | Show provider, model, config sources, cache state, and prefetch status |
 | `--cache-ttl N` | 60 | Cache lifetime in seconds (0 = always fetch fresh) |
 | `--no-cache` | false | Bypass cache entirely |
 | `--clear-cache` | false | Delete cache before running |
 | `--no-prefetch` | false | Disable background refresh |
-| `--prompt TEXT` | built-in | Override the fortune prompt |
-| `--model NAME` | gpt-4o-mini | OpenAI model to use |
-| `--api-key KEY` | — | API key (prefer env var instead) |
 | `--show-log` | — | Print full fortune history and exit |
 | `-r`, `--log-random` | — | Print a random past fortune (no API call) |
 
 **Examples:**
 
 ```bash
-fortunebot                        # instant from cache; background refresh
-fortunebot --verbose              # trace config sources and cache state
-fortunebot --no-cache             # always call the API
-fortunebot --cache-ttl 300        # cache for 5 minutes
-fortunebot -r                     # random fortune from local log, no API
-fortunebot --show-log             # view full fortune history
+fortunebot                                         # instant from cache; background refresh
+fortunebot --verbose                               # trace provider, model, cache state
+fortunebot --provider anthropic                    # use Claude (reads ANTHROPIC_API_KEY)
+fortunebot --model claude-haiku-4-5-20251001       # auto-selects Anthropic provider
+fortunebot --no-cache                              # always call the API
+fortunebot --cache-ttl 300                         # cache for 5 minutes
+fortunebot -r                                      # random fortune from local log, no API
+fortunebot --show-log                              # view full fortune history
 ```
 
 ## How config is resolved
 
 Settings are resolved in this order — first match wins:
 
-1. CLI flags
-2. Environment variables (`FORTUNEBOT_API_KEY` or `OPENAI_API_KEY`; `FORTUNEBOT_MODEL` or `OPENAI_MODEL`; `FORTUNEBOT_PROMPT`)
+1. CLI flags (`--provider`, `--model`, `--api-key`, `--prompt`, …)
+2. Environment variables
 3. `~/.config/fortunebot/fortunebot.env` (or path in `FORTUNEBOT_ENV`)
 4. `~/.config/fortunebot/config.json`
-5. Built-in defaults (`gpt-4o-mini`, 60s TTL)
+5. Built-in defaults (60s TTL; model default depends on provider)
+
+**Provider auto-detection:** if no provider is set explicitly, fortunebot infers it from the model name — `claude-*` models use Anthropic, everything else uses OpenAI.
+
+**Environment variables by provider:**
+
+| Variable | Provider | Purpose |
+|----------|----------|---------|
+| `OPENAI_API_KEY` | OpenAI | API key |
+| `ANTHROPIC_API_KEY` | Anthropic | API key |
+| `FORTUNEBOT_API_KEY` | OpenAI | API key (fortunebot-specific) |
+| `FORTUNEBOT_ANTHROPIC_API_KEY` | Anthropic | API key (fortunebot-specific) |
+| `FORTUNEBOT_PROVIDER` | — | Force provider (`openai` or `anthropic`) |
+| `FORTUNEBOT_MODEL` | — | Model name |
+| `FORTUNEBOT_PROMPT` | — | Fortune prompt |
 
 Run with `--verbose` to see exactly which source each value came from.
 

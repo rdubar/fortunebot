@@ -16,9 +16,10 @@ import (
 )
 
 const (
-	defaultPrompt   = "Generate a very short, funny fortune cookie message about AI, programmers, or neural networks. Maximum 2 short sentences."
-	defaultModel    = "gpt-4o-mini"
-	cacheTTLDefault = 60
+	defaultPrompt         = "Generate a very short, funny fortune cookie message about AI, programmers, or neural networks. Maximum 2 short sentences."
+	defaultModelOpenAI    = "gpt-4o-mini"
+	defaultModelAnthropic = "claude-haiku-4-5-20251001"
+	cacheTTLDefault       = 60
 )
 
 // Paths
@@ -32,8 +33,10 @@ var (
 
 type config struct {
 	APIKey        string `json:"api_key"`
+	AnthropicKey  string `json:"anthropic_api_key"`
 	DefaultPrompt string `json:"default_prompt"`
 	Model         string `json:"model"`
+	Provider      string `json:"provider"`
 }
 
 type fortuneCache struct {
@@ -117,7 +120,6 @@ func applyEnvFile(path string) error {
 		if key == "" {
 			continue
 		}
-		// Let the .env override existing values to reduce confusion.
 		_ = os.Setenv(key, val)
 	}
 	return scanner.Err()
@@ -127,53 +129,88 @@ func applyEnvFile(path string) error {
 func loadConfig() config {
 	b, err := os.ReadFile(configPath)
 	if err != nil {
-		return config{DefaultPrompt: defaultPrompt, Model: defaultModel}
+		return config{DefaultPrompt: defaultPrompt}
 	}
 	var c config
 	if err := json.Unmarshal(b, &c); err != nil {
-		return config{DefaultPrompt: defaultPrompt, Model: defaultModel}
+		return config{DefaultPrompt: defaultPrompt}
 	}
 	if c.DefaultPrompt == "" {
 		c.DefaultPrompt = defaultPrompt
 	}
-	if c.Model == "" {
-		c.Model = defaultModel
-	}
+	// Model is intentionally not defaulted here; resolveProviderAndModel applies provider-specific defaults.
 	return c
 }
 
-// resolveAPIKeyWithSource resolves the API key and explains where it came from.
-func resolveAPIKeyWithSource(cli string, cfg config) (string, string) {
+// resolveProviderAndModel resolves provider and model together since they are interdependent.
+// Provider can be auto-detected from the model name prefix (claude-* → anthropic).
+func resolveProviderAndModel(cliProvider, cliModel string, cfg config) (provider, model, providerSrc, modelSrc string) {
+	// Resolve raw model value before applying defaults.
+	rawModel, rawModelSrc := "", ""
+	if strings.TrimSpace(cliModel) != "" {
+		rawModel, rawModelSrc = cliModel, "--model flag"
+	} else if v := os.Getenv("FORTUNEBOT_MODEL"); v != "" {
+		rawModel, rawModelSrc = v, "env FORTUNEBOT_MODEL"
+	} else if v := os.Getenv("OPENAI_MODEL"); v != "" {
+		rawModel, rawModelSrc = v, "env OPENAI_MODEL"
+	} else if strings.TrimSpace(cfg.Model) != "" {
+		rawModel, rawModelSrc = cfg.Model, "config.json"
+	}
+
+	// Resolve provider: explicit sources first, then auto-detect from model name.
+	switch {
+	case strings.TrimSpace(cliProvider) != "":
+		provider, providerSrc = cliProvider, "--provider flag"
+	case os.Getenv("FORTUNEBOT_PROVIDER") != "":
+		provider, providerSrc = os.Getenv("FORTUNEBOT_PROVIDER"), "env FORTUNEBOT_PROVIDER"
+	case strings.TrimSpace(cfg.Provider) != "":
+		provider, providerSrc = cfg.Provider, "config.json"
+	case strings.HasPrefix(rawModel, "claude-"):
+		provider, providerSrc = "anthropic", "auto-detected from model name"
+	case rawModel != "":
+		provider, providerSrc = "openai", "auto-detected from model name"
+	default:
+		provider, providerSrc = "openai", "default"
+	}
+
+	// Apply model with provider-aware defaults.
+	if rawModel != "" {
+		model, modelSrc = rawModel, rawModelSrc
+	} else if provider == "anthropic" {
+		model, modelSrc = defaultModelAnthropic, "built-in default"
+	} else {
+		model, modelSrc = defaultModelOpenAI, "built-in default"
+	}
+	return
+}
+
+// resolveAPIKeyWithSource resolves the API key for the active provider.
+func resolveAPIKeyWithSource(cli, provider string, cfg config) (string, string) {
 	if strings.TrimSpace(cli) != "" {
 		return cli, "--api-key flag"
 	}
-	if v := os.Getenv("FORTUNEBOT_API_KEY"); v != "" {
-		return v, "env FORTUNEBOT_API_KEY"
-	}
-	if v := os.Getenv("OPENAI_API_KEY"); v != "" {
-		return v, "env OPENAI_API_KEY"
-	}
-	if strings.TrimSpace(cfg.APIKey) != "" {
-		return cfg.APIKey, "~/.config/fortunebot/config.json"
+	if provider == "anthropic" {
+		if v := os.Getenv("FORTUNEBOT_ANTHROPIC_API_KEY"); v != "" {
+			return v, "env FORTUNEBOT_ANTHROPIC_API_KEY"
+		}
+		if v := os.Getenv("ANTHROPIC_API_KEY"); v != "" {
+			return v, "env ANTHROPIC_API_KEY"
+		}
+		if strings.TrimSpace(cfg.AnthropicKey) != "" {
+			return cfg.AnthropicKey, "config.json"
+		}
+	} else {
+		if v := os.Getenv("FORTUNEBOT_API_KEY"); v != "" {
+			return v, "env FORTUNEBOT_API_KEY"
+		}
+		if v := os.Getenv("OPENAI_API_KEY"); v != "" {
+			return v, "env OPENAI_API_KEY"
+		}
+		if strings.TrimSpace(cfg.APIKey) != "" {
+			return cfg.APIKey, "config.json"
+		}
 	}
 	return "", "none found"
-}
-
-// resolveModelWithSource resolves the model and explains where it came from.
-func resolveModelWithSource(cli string, cfg config) (string, string) {
-	if strings.TrimSpace(cli) != "" {
-		return cli, "--model flag"
-	}
-	if v := os.Getenv("FORTUNEBOT_MODEL"); v != "" {
-		return v, "env FORTUNEBOT_MODEL"
-	}
-	if v := os.Getenv("OPENAI_MODEL"); v != "" {
-		return v, "env OPENAI_MODEL"
-	}
-	if strings.TrimSpace(cfg.Model) != "" {
-		return cfg.Model, "~/.config/fortunebot/config.json"
-	}
-	return defaultModel, "built-in default"
 }
 
 // resolvePromptWithSource resolves the prompt and explains where it came from.
@@ -185,7 +222,7 @@ func resolvePromptWithSource(cli string, cfg config) (string, string) {
 		return v, "env FORTUNEBOT_PROMPT"
 	}
 	if strings.TrimSpace(cfg.DefaultPrompt) != "" {
-		return cfg.DefaultPrompt, "~/.config/fortunebot/config.json"
+		return cfg.DefaultPrompt, "config.json"
 	}
 	return defaultPrompt, "built-in default"
 }
@@ -276,11 +313,20 @@ func printLog() {
 	fmt.Print(string(b))
 }
 
-func generateFortune(prompt, apiKey, model string) (string, error) {
+// generateFortune dispatches to the appropriate provider implementation.
+func generateFortune(prompt, apiKey, model, provider string) (string, error) {
 	if apiKey == "" {
-		return "", fmt.Errorf("no API key provided")
+		return "", fmt.Errorf("no API key provided (provider: %s)", provider)
 	}
+	switch provider {
+	case "anthropic":
+		return generateFortuneAnthropic(prompt, apiKey, model)
+	default:
+		return generateFortuneOpenAI(prompt, apiKey, model)
+	}
+}
 
+func generateFortuneOpenAI(prompt, apiKey, model string) (string, error) {
 	type msg struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
@@ -330,19 +376,70 @@ func generateFortune(prompt, apiKey, model string) (string, error) {
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", err
 	}
-
-	fortune := ""
-	if len(parsed.Choices) > 0 {
-		fortune = strings.TrimSpace(parsed.Choices[0].Message.Content)
-	}
-	if fortune == "" {
+	if len(parsed.Choices) == 0 || strings.TrimSpace(parsed.Choices[0].Message.Content) == "" {
 		return "", fmt.Errorf("empty response from API")
 	}
-	return "🤖 " + fortune, nil
+	return "🤖 " + strings.TrimSpace(parsed.Choices[0].Message.Content), nil
+}
+
+func generateFortuneAnthropic(prompt, apiKey, model string) (string, error) {
+	type msg struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	}
+	reqBody := map[string]interface{}{
+		"model":      model,
+		"max_tokens": 60,
+		"system":     "You are a fortune cookie generator.",
+		"messages":   []msg{{Role: "user", Content: prompt}},
+	}
+
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.anthropic.com/v1/messages", strings.NewReader(string(payload)))
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("x-api-key", apiKey)
+	httpReq.Header.Set("anthropic-version", "2023-06-01")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
+	}
+
+	var parsed struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", err
+	}
+	if len(parsed.Content) == 0 || strings.TrimSpace(parsed.Content[0].Text) == "" {
+		return "", fmt.Errorf("empty response from API")
+	}
+	return "🤖 " + strings.TrimSpace(parsed.Content[0].Text), nil
 }
 
 // startPrefetch spawns a detached worker process to refresh cache/log.
-func startPrefetch(prompt, apiKey, model string, verbose bool) {
+func startPrefetch(prompt, apiKey, model, provider string, verbose bool) {
 	exe, err := os.Executable()
 	if err != nil {
 		if verbose {
@@ -350,7 +447,7 @@ func startPrefetch(prompt, apiKey, model string, verbose bool) {
 		}
 		return
 	}
-	args := []string{"--prefetch-worker", "--prompt", prompt, "--model", model}
+	args := []string{"--prefetch-worker", "--prompt", prompt, "--model", model, "--provider", provider}
 	if apiKey != "" {
 		args = append(args, "--api-key", apiKey)
 	}
@@ -360,8 +457,10 @@ func startPrefetch(prompt, apiKey, model string, verbose bool) {
 		Files: []*os.File{os.Stdout, os.Stderr, os.Stderr},
 	}
 	proc, err := os.StartProcess(exe, append([]string{exe}, args...), cmd)
-	if err != nil && verbose {
-		fmt.Fprintf(os.Stderr, "[fortunebot] Failed to start prefetch: %v\n", err)
+	if err != nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "[fortunebot] Failed to start prefetch: %v\n", err)
+		}
 		return
 	}
 	defer proc.Release()
@@ -371,8 +470,8 @@ func startPrefetch(prompt, apiKey, model string, verbose bool) {
 }
 
 // runPrefetchWorker performs one fetch/save/log for the background process.
-func runPrefetchWorker(prompt, apiKey, model string) int {
-	fortune, err := generateFortune(prompt, apiKey, model)
+func runPrefetchWorker(prompt, apiKey, model, provider string) int {
+	fortune, err := generateFortune(prompt, apiKey, model, provider)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[fortunebot] Background prefetch failed: %v\n", err)
 		return 1
@@ -423,9 +522,10 @@ func main() {
 	cfg := loadConfig()
 
 	var (
-		flagPrompt       = flag.String("prompt", "", "Override prompt for the fortune.")
-		flagAPIKey       = flag.String("api-key", "", "OpenAI API key.")
-		flagModel        = flag.String("model", "", "Model to use.")
+		flagPrompt       = flag.String("prompt", "", "Override the fortune prompt.")
+		flagAPIKey       = flag.String("api-key", "", "API key for the active provider.")
+		flagModel        = flag.String("model", "", "Model to use (e.g. gpt-4o-mini, claude-haiku-4-5-20251001).")
+		flagProvider     = flag.String("provider", "", "API provider: openai or anthropic (auto-detected by default).")
 		flagCacheTTL     = flag.Int("cache-ttl", cacheTTLDefault, "Cache TTL in seconds (0 disables cache).")
 		flagNoCache      = flag.Bool("no-cache", false, "Disable cache.")
 		flagClearCache   = flag.Bool("clear-cache", false, "Delete cache before running.")
@@ -436,7 +536,6 @@ func main() {
 		flagPrefetchWork = flag.Bool("prefetch-worker", false, "Internal: run as prefetch worker.")
 		flagLogRandom    = flag.Bool("log-random", false, "Print a random fortune from the log instead of calling the API.")
 	)
-	// Short flag aliases
 	flag.BoolVar(flagLogRandom, "r", false, "Print a random fortune from the log instead of calling the API.")
 	flag.Parse()
 
@@ -444,9 +543,9 @@ func main() {
 
 	if *flagPrefetchWork {
 		prompt, _ := resolvePromptWithSource(*flagPrompt, cfg)
-		apiKey, _ := resolveAPIKeyWithSource(*flagAPIKey, cfg)
-		model, _ := resolveModelWithSource(*flagModel, cfg)
-		os.Exit(runPrefetchWorker(prompt, apiKey, model))
+		provider, model, _, _ := resolveProviderAndModel(*flagProvider, *flagModel, cfg)
+		apiKey, _ := resolveAPIKeyWithSource(*flagAPIKey, provider, cfg)
+		os.Exit(runPrefetchWorker(prompt, apiKey, model, provider))
 	}
 
 	if *flagShowLog {
@@ -472,12 +571,13 @@ func main() {
 	}
 
 	prompt, promptSrc := resolvePromptWithSource(*flagPrompt, cfg)
-	apiKey, apiSrc := resolveAPIKeyWithSource(*flagAPIKey, cfg)
-	model, modelSrc := resolveModelWithSource(*flagModel, cfg)
+	provider, model, providerSrc, modelSrc := resolveProviderAndModel(*flagProvider, *flagModel, cfg)
+	apiKey, apiSrc := resolveAPIKeyWithSource(*flagAPIKey, provider, cfg)
 
 	if verbose {
-		fmt.Printf("[fortunebot] Using prompt (source: %s)\n", promptSrc)
+		fmt.Printf("[fortunebot] Using provider: %s (source: %s)\n", provider, providerSrc)
 		fmt.Printf("[fortunebot] Using model: %s (source: %s)\n", model, modelSrc)
+		fmt.Printf("[fortunebot] Using prompt (source: %s)\n", promptSrc)
 		if apiKey != "" {
 			fmt.Printf("[fortunebot] Using API key from: %s (%s)\n", apiSrc, maskKey(apiKey))
 		} else {
@@ -496,7 +596,7 @@ func main() {
 				}
 				fmt.Println(cache.Fortune)
 				if !*flagNoPrefetch {
-					startPrefetch(prompt, apiKey, model, verbose)
+					startPrefetch(prompt, apiKey, model, provider, verbose)
 				}
 				return
 			}
@@ -505,7 +605,7 @@ func main() {
 			}
 			fmt.Println(cache.Fortune)
 			if !*flagNoPrefetch {
-				startPrefetch(prompt, apiKey, model, verbose)
+				startPrefetch(prompt, apiKey, model, provider, verbose)
 			}
 			return
 		}
@@ -518,7 +618,7 @@ func main() {
 		}
 	}
 
-	fortune, err := generateFortune(prompt, apiKey, model)
+	fortune, err := generateFortune(prompt, apiKey, model, provider)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[fortunebot] Error: %v\n", err)
 		os.Exit(1)
@@ -529,8 +629,7 @@ func main() {
 	if caching {
 		saveCache(fortune)
 		if !*flagNoPrefetch {
-			startPrefetch(prompt, apiKey, model, verbose)
+			startPrefetch(prompt, apiKey, model, provider, verbose)
 		}
 	}
 }
-
