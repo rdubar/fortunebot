@@ -1,75 +1,143 @@
-# fortunebot (Go)
+# fortunebot
 
-AI-powered take on the classic Unix `fortune`: short, funny fortunes generated on the fly via the OpenAI Responses API.
+An AI-powered take on the classic Unix `fortune` command. Generates short, witty fortunes via the OpenAI API and delivers them instantly — every time — thanks to a stale-while-revalidate cache with background prefetching.
 
-## Setup
-Requires Go 1.21+.
+Built in Go with zero external dependencies.
 
-**Option A — `go install` (simplest, no clone needed):**
+## Features
+
+- **Instant responses** — serves from cache while silently refreshing in the background
+- **Stale-while-revalidate** — never blocks on an API call; stale cache is served immediately and replaced for next time
+- **Configurable prompt** — change the fortune style via flag, environment variable, or config file
+- **Multi-source config resolution** — flags → environment → config file → built-in defaults, with `--verbose` tracing each source
+- **Fortune log** — every new fortune is appended to a local log; replay a random past fortune offline with `-r`
+- **XDG-compliant paths** — config in `~/.config/fortunebot/`, data in `~/.local/share/fortunebot/`
+- **Zero dependencies** — stdlib only; single static binary
+
+## Quick start
+
+```bash
+go install github.com/rdubar/fortunebot/cmd/fortunebot@latest
+export OPENAI_API_KEY=sk-...
+fortunebot
+```
+
+> Output: `🤖 "Your next best friend might just be a neural network — just don't ask it to borrow money!"`
+
+## Installation
+
+**Option A — `go install` (no clone needed):**
 ```bash
 go install github.com/rdubar/fortunebot/cmd/fortunebot@latest
 ```
-This installs to `$(go env GOPATH)/bin` (usually `~/go/bin`). Ensure that’s on your `PATH`.
+Installs to `$(go env GOPATH)/bin` — ensure that's on your `PATH`.
 
-**Option B — clone and `make install` (installs to `~/.local/bin`):**
+**Option B — clone and build:**
 ```bash
-gh repo clone rdubar/fortunebot
+git clone https://github.com/rdubar/fortunebot.git
 cd fortunebot
-make install
+make install          # builds and installs to ~/.local/bin
 ```
-Ensure `~/.local/bin` is on your PATH (add to `~/.zshrc`):
+Ensure `~/.local/bin` is on your PATH:
 ```bash
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"   # add to ~/.zshrc
 ```
 
-**API key setup** — if `OPENAI_API_KEY` isn’t already exported, create an env file:
+**To update:** re-run either install command. `make install` rebuilds from source automatically.
+
+## API key setup
+
+If `OPENAI_API_KEY` isn't already in your environment, create a local env file:
+
 ```bash
 mkdir -p ~/.config/fortunebot
 cp examples/fortunebot.env.example ~/.config/fortunebot/fortunebot.env
-nano ~/.config/fortunebot/fortunebot.env   # set OPENAI_API_KEY=sk-...
+$EDITOR ~/.config/fortunebot/fortunebot.env   # set OPENAI_API_KEY=sk-...
 ```
-Then run `fortunebot`.
 
-Tip: each run prefetches the next fortune in the background, so subsequent runs are instant. `fortunebot -r` shows a random fortune from the log without calling the API.
-
-## Optional extras
-- Optional prompt override: set `FORTUNEBOT_PROMPT` in the env file (or export it) to change the fortune style without CLI flags.
-- Copy `examples/config.example.json` → `config.json` for non-secret defaults (prompt/model). Keep secrets in the env file.
-- Build: `make build` or `go build -trimpath -ldflags="-s -w" -o fortunebot ./cmd/fortunebot`
-- Install to `~/.local/bin` (no sudo): `make install`
-- Uninstall the installed binary (leaves config/cache/logs intact): `make uninstall`
-- Run without building: `go run ./cmd/fortunebot`
-
-## How config is resolved
-1) CLI flags (`--api-key`, `--prompt`, `--cache-ttl`, etc.)
-2) Environment variables / `fortunebot.env`: standard location is `~/.config/fortunebot/fortunebot.env` (recommended). You can also set `FORTUNEBOT_ENV=/path/to/fortunebot.env` to point elsewhere. Keys: `FORTUNEBOT_API_KEY` or `OPENAI_API_KEY`; `FORTUNEBOT_MODEL` or `OPENAI_MODEL`.
-3) `~/.config/fortunebot/config.json` (or local `config.json` if you choose).
-4) Built-in defaults (`gpt-4o-mini`, short fortune prompt).
-
-Recommendation: put API keys in `fortunebot.env` (gitignored) or real env vars. Use `config.json` only for non-secret defaults.
+fortunebot picks this up automatically on startup. Keys in the env file take precedence over `config.json`.
 
 ## Usage
-- Default: `./fortunebot` — instant return if cache is fresh; background prefetch for next run (60s TTL).
-- Always fresh: `./fortunebot --cache-ttl 0` or `--no-cache`
-- Adjust cache TTL: `./fortunebot --cache-ttl 120`
-- Clear cache: `./fortunebot --clear-cache`
-- Verbosity: quiet by default; enable chatter with `./fortunebot --verbose` (or re-quiet with `--quiet`)
-- Prefetch control: disable with `./fortunebot --no-prefetch`
-- View log: `./fortunebot --show-log`
-- Random from log (no API): `./fortunebot --log-random` or `./fortunebot -r`
 
-### Background prefetch
-- When a cache is fresh, the current fortune is printed immediately and a background subprocess fetches the next one. In quiet mode, only errors show; in `--verbose`, you’ll see “Background prefetch started/complete.”
-- When a cache is stale, the stale fortune is printed immediately, and a background fetch replaces it for the next run.
-- The background worker writes to `cache.json` (in `~/.local/share/fortunebot/`) and appends to `fortunebot.log` (next to the binary, gitignored). The main command never blocks on these background fetches.
+```
+fortunebot [flags]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--verbose` | off | Show config sources, cache state, and prefetch status |
+| `--cache-ttl N` | 60 | Cache lifetime in seconds (0 = always fetch fresh) |
+| `--no-cache` | false | Bypass cache entirely |
+| `--clear-cache` | false | Delete cache before running |
+| `--no-prefetch` | false | Disable background refresh |
+| `--prompt TEXT` | built-in | Override the fortune prompt |
+| `--model NAME` | gpt-4o-mini | OpenAI model to use |
+| `--api-key KEY` | — | API key (prefer env var instead) |
+| `--show-log` | — | Print full fortune history and exit |
+| `-r`, `--log-random` | — | Print a random past fortune (no API call) |
+
+**Examples:**
+
+```bash
+fortunebot                        # instant from cache; background refresh
+fortunebot --verbose              # trace config sources and cache state
+fortunebot --no-cache             # always call the API
+fortunebot --cache-ttl 300        # cache for 5 minutes
+fortunebot -r                     # random fortune from local log, no API
+fortunebot --show-log             # view full fortune history
+```
+
+## How config is resolved
+
+Settings are resolved in this order — first match wins:
+
+1. CLI flags
+2. Environment variables (`FORTUNEBOT_API_KEY` or `OPENAI_API_KEY`; `FORTUNEBOT_MODEL` or `OPENAI_MODEL`; `FORTUNEBOT_PROMPT`)
+3. `~/.config/fortunebot/fortunebot.env` (or path in `FORTUNEBOT_ENV`)
+4. `~/.config/fortunebot/config.json`
+5. Built-in defaults (`gpt-4o-mini`, 60s TTL)
+
+Run with `--verbose` to see exactly which source each value came from.
+
+## How background prefetch works
+
+On each run, fortunebot:
+
+1. Checks the cache. If fresh (within TTL), serves immediately.
+2. Spawns a detached subprocess to fetch the next fortune from the API.
+3. The subprocess saves to `~/.local/share/fortunebot/cache.json` and appends to `fortunebot.log`.
+4. The main process exits — no waiting.
+
+If the cache is stale, the stale fortune is served immediately while the subprocess replaces it. The result is sub-millisecond response time on every run after the first.
+
+## Development
+
+```bash
+make build    # compile to ./fortunebot
+make run      # build and run
+make install  # install to ~/.local/bin
+make clean    # remove local binary
+make uninstall
+```
+
+Or without make:
+```bash
+go run ./cmd/fortunebot --verbose
+go build -trimpath -ldflags="-s -w" -o fortunebot ./cmd/fortunebot
+```
+
+Requires Go 1.21+. No external dependencies.
 
 ## Contributing
-- Issues and PRs welcome. Keep the Go CLI as the primary entry point.
+
+Issues and PRs welcome. The Go CLI in `cmd/fortunebot/` is the sole entry point — keep it that way.
 
 ## License
-MIT
+
+MIT — see [LICENSE](LICENSE).
 
 ## Author
-Roger Dubar — rdubar@gmail.com — GitHub: [rdubar](https://github.com/rdubar)
 
-Coding assistance: OpenAI Codex and [Claude Code](https://claude.ai/code) (Anthropic).
+**Roger Dubar** — [rdubar@gmail.com](mailto:rdubar@gmail.com) — [github.com/rdubar](https://github.com/rdubar)
+
+Coding assistance: [Claude Code](https://claude.ai/code) (Anthropic) and OpenAI Codex.
