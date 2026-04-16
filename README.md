@@ -63,4 +63,4 @@ MIT
 ## Author
 Roger Dubar — rdubar@gmail.com — GitHub: [rdubar](https://github.com/rdubar)
 
-Coding assistance: OpenAI Codex.
+Coding assistance: OpenAI Codex and [Claude Code](https://claude.ai/code) (Anthropic).

@@ -220,7 +220,11 @@ func saveCache(f string) {
 		fmt.Fprintf(os.Stderr, "[fortunebot] Failed to create data dir: %v\n", err)
 		return
 	}
-	payload, _ := json.Marshal(fortuneCache{Fortune: f, Timestamp: float64(time.Now().Unix())})
+	payload, err := json.Marshal(fortuneCache{Fortune: f, Timestamp: float64(time.Now().Unix())})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[fortunebot] Failed to marshal cache: %v\n", err)
+		return
+	}
 	if err := os.WriteFile(cachePath, payload, 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "[fortunebot] Failed to write cache: %v\n", err)
 	}
@@ -282,17 +286,20 @@ func generateFortune(prompt, apiKey, model string) (string, error) {
 		Content string `json:"content"`
 	}
 	reqBody := map[string]interface{}{
-		"model":             model,
-		"input":             []msg{{Role: "system", Content: "You are a fortune cookie generator."}, {Role: "user", Content: prompt}},
-		"max_output_tokens": 60,
-		"temperature":       0.9,
+		"model":       model,
+		"messages":    []msg{{Role: "system", Content: "You are a fortune cookie generator."}, {Role: "user", Content: prompt}},
+		"max_tokens":  60,
+		"temperature": 0.9,
 	}
 
-	payload, _ := json.Marshal(reqBody)
+	payload, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal request: %w", err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/responses", strings.NewReader(string(payload)))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.openai.com/v1/chat/completions", strings.NewReader(string(payload)))
 	if err != nil {
 		return "", err
 	}
@@ -305,28 +312,28 @@ func generateFortune(prompt, apiKey, model string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
 	if resp.StatusCode >= 300 {
 		return "", fmt.Errorf("API error (%d): %s", resp.StatusCode, string(body))
 	}
 
 	var parsed struct {
-		Output []struct {
-			Content []struct {
-				Text string `json:"text"`
-			} `json:"content"`
-		} `json:"output"`
-		OutputText string `json:"output_text"`
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", err
 	}
 
 	fortune := ""
-	if len(parsed.Output) > 0 && len(parsed.Output[0].Content) > 0 {
-		fortune = strings.TrimSpace(parsed.Output[0].Content[0].Text)
-	} else if parsed.OutputText != "" {
-		fortune = strings.TrimSpace(parsed.OutputText)
+	if len(parsed.Choices) > 0 {
+		fortune = strings.TrimSpace(parsed.Choices[0].Message.Content)
 	}
 	if fortune == "" {
 		return "", fmt.Errorf("empty response from API")
@@ -357,6 +364,7 @@ func startPrefetch(prompt, apiKey, model string, verbose bool) {
 		fmt.Fprintf(os.Stderr, "[fortunebot] Failed to start prefetch: %v\n", err)
 		return
 	}
+	defer proc.Release()
 	if verbose {
 		fmt.Printf("[fortunebot] Background prefetch started (pid %d).\n", proc.Pid)
 	}
@@ -407,7 +415,6 @@ func randomFortuneFromLog() (string, error) {
 	if len(fortunes) == 0 {
 		return "", fmt.Errorf("no fortunes found in log")
 	}
-	rand.Seed(time.Now().UnixNano())
 	return fortunes[rand.Intn(len(fortunes))], nil
 }
 
@@ -527,11 +534,3 @@ func main() {
 	}
 }
 
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
-}
