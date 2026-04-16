@@ -5,29 +5,38 @@ AI-powered take on the classic Unix `fortune`: short, funny fortunes generated o
 ## Setup
 Requires Go 1.21+.
 
-Quick start (uses your existing `OPENAI_API_KEY`/`FORTUNEBOT_API_KEY` if set):
+**Option A — `go install` (simplest, no clone needed):**
+```bash
+go install github.com/rdubar/fortunebot/cmd/fortunebot@latest
+```
+This installs to `$(go env GOPATH)/bin` (usually `~/go/bin`). Ensure that’s on your `PATH`.
+
+**Option B — clone and `make install` (installs to `~/.local/bin`):**
 ```bash
 gh repo clone rdubar/fortunebot
 cd fortunebot
-make install   # builds and copies to ~/.local/bin/fortunebot
-fortunebot     # prints a fortune
+make install
+```
+Ensure `~/.local/bin` is on your PATH (add to `~/.zshrc`):
+```bash
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
-If you don’t export a key already, create an env file at the standard location `~/.config/fortunebot/fortunebot.env`:
+**API key setup** — if `OPENAI_API_KEY` isn’t already exported, create an env file:
 ```bash
 mkdir -p ~/.config/fortunebot
 cp examples/fortunebot.env.example ~/.config/fortunebot/fortunebot.env
 nano ~/.config/fortunebot/fortunebot.env   # set OPENAI_API_KEY=sk-...
 ```
-Then re-run `fortunebot`.
+Then run `fortunebot`.
 
 Tip: each run prefetches the next fortune in the background, so subsequent runs are instant. `fortunebot -r` shows a random fortune from the log without calling the API.
 
 ## Optional extras
 - Optional prompt override: set `FORTUNEBOT_PROMPT` in the env file (or export it) to change the fortune style without CLI flags.
 - Copy `examples/config.example.json` → `config.json` for non-secret defaults (prompt/model). Keep secrets in the env file.
-- Build: `go build -o fortunebot ./cmd/fortunebot` or `make build`
-- Install to `~/.local/bin` (no sudo): `make install` (ensure `~/.local/bin` is on your PATH)
+- Build: `make build` or `go build -trimpath -ldflags="-s -w" -o fortunebot ./cmd/fortunebot`
+- Install to `~/.local/bin` (no sudo): `make install`
 - Uninstall the installed binary (leaves config/cache/logs intact): `make uninstall`
 - Run without building: `go run ./cmd/fortunebot`
 

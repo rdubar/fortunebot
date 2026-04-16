@@ -1,21 +1,24 @@
-APP_NAME := fortunebot
+APP_NAME  := fortunebot
+INSTALL_DIR := $(HOME)/.local/bin
+LDFLAGS   := -s -w
 
-.PHONY: build run clean uninstall
+.PHONY: build run install clean uninstall
 
 build:
-	GO111MODULE=on go build -o $(APP_NAME) ./cmd/fortunebot
+	go build -trimpath -ldflags="$(LDFLAGS)" -o $(APP_NAME) ./cmd/fortunebot
 
 run: build
 	./$(APP_NAME)
 
 install: build
-	mkdir -p ~/.local/bin
-	cp $(APP_NAME) ~/.local/bin/$(APP_NAME)
-	@echo "Installed to ~/.local/bin/$(APP_NAME). Ensure ~/.local/bin is on your PATH."
+	mkdir -p $(INSTALL_DIR)
+	install -m 755 $(APP_NAME) $(INSTALL_DIR)/$(APP_NAME)
+	@echo "Installed to $(INSTALL_DIR)/$(APP_NAME)"
+	@echo "Ensure $(INSTALL_DIR) is on your PATH (add to ~/.zshrc: export PATH=\"\$$HOME/.local/bin:\$$PATH\")"
 
 clean:
 	rm -f $(APP_NAME)
 
 uninstall:
-	rm -f ~/.local/bin/$(APP_NAME)
-	@echo "Removed ~/.local/bin/$(APP_NAME). User config/log/cache left untouched."
+	rm -f $(INSTALL_DIR)/$(APP_NAME)
+	@echo "Removed $(INSTALL_DIR)/$(APP_NAME). User config/log/cache left untouched."
