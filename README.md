@@ -145,6 +145,12 @@ go build -trimpath -ldflags="-s -w" -o fortunebot ./cmd/fortunebot
 
 Requires Go 1.21+. No external dependencies.
 
+## Background: the Unix fortune tradition
+
+The [`fortune`](https://en.wikipedia.org/wiki/Fortune_(Unix)) program has been a staple of Unix systems since the 1970s — a simple utility that prints a random quote, joke, or aphorism from a flat text database. For decades it was the standard way to greet terminal users with something unexpected.
+
+fortunebot brings that tradition into the AI age: instead of drawing from a static file, it generates a fresh fortune on demand using a large language model, with a stale-while-revalidate cache so it stays instant.
+
 ## Contributing
 
 Issues and PRs welcome. The Go CLI in `cmd/fortunebot/` is the sole entry point — keep it that way.
