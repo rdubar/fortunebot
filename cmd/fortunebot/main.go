@@ -19,7 +19,7 @@ import (
 const (
 	defaultPrompt         = "Generate a very short, funny fortune cookie message about AI, programmers, or neural networks. Maximum 2 short sentences."
 	defaultModelOpenAI    = "gpt-4o-mini"
-	defaultModelAnthropic = "claude-haiku-4-5-20251001"
+	defaultModelAnthropic = "claude-sonnet-4-6"
 	cacheTTLDefault       = 60
 )
 

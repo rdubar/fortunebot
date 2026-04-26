@@ -66,7 +66,7 @@ fortunebot [flags]
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--provider NAME` | auto | API provider: `openai` or `anthropic` (auto-detected from model name) |
-| `--model NAME` | provider default | Model to use (e.g. `gpt-4o-mini`, `claude-haiku-4-5-20251001`) |
+| `--model NAME` | provider default | Model to use (e.g. `gpt-4o-mini`, `claude-sonnet-4-6`) |
 | `--api-key KEY` | — | API key for the active provider (prefer env var instead) |
 | `--prompt TEXT` | built-in | Override the fortune prompt |
 | `--verbose` | off | Show provider, model, config sources, cache state, and prefetch status |
@@ -85,7 +85,7 @@ fortunebot [flags]
 fortunebot                                         # instant from cache; background refresh
 fortunebot --verbose                               # trace provider, model, cache state
 fortunebot --provider anthropic                    # use Claude (reads ANTHROPIC_API_KEY)
-fortunebot --model claude-haiku-4-5-20251001       # auto-selects Anthropic provider
+fortunebot --model claude-sonnet-4-6               # auto-selects Anthropic provider
 fortunebot --no-cache                              # always call the API
 fortunebot --cache-ttl 300                         # cache for 5 minutes
 fortunebot -r                                      # random fortune from local log, no API
