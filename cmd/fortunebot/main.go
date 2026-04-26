@@ -126,20 +126,17 @@ func applyEnvFile(path string) error {
 	return scanner.Err()
 }
 
-// loadConfig reads the optional JSON config file and fills defaults.
+// loadConfig reads the optional JSON config file. Returns an empty config if missing or unparseable.
+// Defaults are applied downstream by the resolve* functions so source labels are accurate.
 func loadConfig() config {
 	b, err := os.ReadFile(configPath)
 	if err != nil {
-		return config{DefaultPrompt: defaultPrompt}
+		return config{}
 	}
 	var c config
 	if err := json.Unmarshal(b, &c); err != nil {
-		return config{DefaultPrompt: defaultPrompt}
+		return config{}
 	}
-	if c.DefaultPrompt == "" {
-		c.DefaultPrompt = defaultPrompt
-	}
-	// Model is intentionally not defaulted here; resolveProviderAndModel applies provider-specific defaults.
 	return c
 }
 
