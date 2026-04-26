@@ -489,12 +489,65 @@ func formatAge(ts float64) string {
 	return fmt.Sprintf("%ds", int(age.Seconds()))
 }
 
-// maskKey partially masks an API key for display.
+// maskKey shows the first 10 characters of a key followed by "...".
 func maskKey(k string) string {
-	if len(k) <= 8 {
+	if len(k) <= 10 {
 		return k
 	}
-	return fmt.Sprintf("%s***%s", k[:4], k[len(k)-4:])
+	return k[:10] + "..."
+}
+
+func fileStatus(path string) string {
+	if _, err := os.Stat(path); err == nil {
+		return "exists"
+	}
+	return "not found"
+}
+
+func printStatus(cfg config, cliProvider, cliModel, cliAPIKey, cliPrompt string, cacheTTL int) {
+	provider, model, providerSrc, modelSrc := resolveProviderAndModel(cliProvider, cliModel, cfg)
+	apiKey, apiSrc := resolveAPIKeyWithSource(cliAPIKey, provider, cfg)
+	_, promptSrc := resolvePromptWithSource(cliPrompt, cfg)
+
+	yes := func(b bool) string {
+		if b {
+			return "yes"
+		}
+		return "no"
+	}
+
+	fmt.Println("fortunebot status")
+	fmt.Println("─────────────────────────────────────────")
+
+	fmt.Println("\nProvider & model:")
+	fmt.Printf("  provider : %s  (source: %s)\n", provider, providerSrc)
+	fmt.Printf("  model    : %s  (source: %s)\n", model, modelSrc)
+
+	fmt.Println("\nAPI key:")
+	if apiKey != "" {
+		fmt.Printf("  key      : %s  (source: %s)\n", maskKey(apiKey), apiSrc)
+	} else {
+		fmt.Printf("  key      : NOT SET  (source: %s)\n", apiSrc)
+	}
+
+	fmt.Println("\nPrompt:")
+	fmt.Printf("  source   : %s\n", promptSrc)
+
+	fmt.Println("\nCache:")
+	fmt.Printf("  path     : %s  (%s)\n", cachePath, fileStatus(cachePath))
+	if cache, err := loadCache(); err == nil {
+		fmt.Printf("  age      : %s  (TTL: %ds, fresh: %s)\n", formatAge(cache.Timestamp), cacheTTL, yes(cacheIsFresh(cache, cacheTTL)))
+	} else {
+		fmt.Printf("  age      : n/a\n")
+	}
+
+	fmt.Println("\nFiles:")
+	fmt.Printf("  config   : %s  (%s)\n", configPath, fileStatus(configPath))
+	fmt.Printf("  log      : %s  (%s)\n", logPath, fileStatus(logPath))
+
+	envFile := filepath.Join(filepath.Dir(configPath), "fortunebot.env")
+	fmt.Printf("  env file : %s  (%s)\n", envFile, fileStatus(envFile))
+	fmt.Println()
 }
 
 // randomFortuneFromLog picks a random fortune from the log file.
@@ -533,6 +586,7 @@ func main() {
 		flagVerbose      = flag.Bool("verbose", false, "Verbose output.")
 		flagQuiet        = flag.Bool("quiet", false, "Quiet output (default).")
 		flagShowLog      = flag.Bool("show-log", false, "Print fortune log and exit.")
+		flagStatus       = flag.Bool("status", false, "Print resolved config, paths, and cache state, then exit.")
 		flagPrefetchWork = flag.Bool("prefetch-worker", false, "Internal: run as prefetch worker.")
 		flagLogRandom    = flag.Bool("log-random", false, "Print a random fortune from the log instead of calling the API.")
 	)
@@ -546,6 +600,11 @@ func main() {
 		provider, model, _, _ := resolveProviderAndModel(*flagProvider, *flagModel, cfg)
 		apiKey, _ := resolveAPIKeyWithSource(*flagAPIKey, provider, cfg)
 		os.Exit(runPrefetchWorker(prompt, apiKey, model, provider))
+	}
+
+	if *flagStatus {
+		printStatus(cfg, *flagProvider, *flagModel, *flagAPIKey, *flagPrompt, *flagCacheTTL)
+		return
 	}
 
 	if *flagShowLog {
