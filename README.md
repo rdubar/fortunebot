@@ -74,6 +74,7 @@ fortunebot [flags]
 | `--no-cache` | false | Bypass cache entirely |
 | `--clear-cache` | false | Delete cache before running |
 | `--no-prefetch` | false | Disable background refresh |
+| `--update` | — | Update to the latest version via `go install` |
 | `--status` | — | Show resolved config, API key, paths, and cache state, then exit |
 | `--show-log` | — | Print full fortune history and exit |
 | `-r`, `--log-random` | — | Print a random past fortune (no API call) |

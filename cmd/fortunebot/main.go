@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -504,6 +505,19 @@ func fileStatus(path string) string {
 	return "not found"
 }
 
+func runUpdate() {
+	const pkg = "github.com/rdubar/fortunebot/cmd/fortunebot@latest"
+	fmt.Printf("Updating fortunebot via go install %s\n", pkg)
+	cmd := exec.Command("go", "install", pkg)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "[fortunebot] Update failed: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("fortunebot updated.")
+}
+
 func printStatus(cfg config, cliProvider, cliModel, cliAPIKey, cliPrompt string, cacheTTL int) {
 	provider, model, providerSrc, modelSrc := resolveProviderAndModel(cliProvider, cliModel, cfg)
 	apiKey, apiSrc := resolveAPIKeyWithSource(cliAPIKey, provider, cfg)
@@ -587,6 +601,7 @@ func main() {
 		flagQuiet        = flag.Bool("quiet", false, "Quiet output (default).")
 		flagShowLog      = flag.Bool("show-log", false, "Print fortune log and exit.")
 		flagStatus       = flag.Bool("status", false, "Print resolved config, paths, and cache state, then exit.")
+		flagUpdate       = flag.Bool("update", false, "Update fortunebot to the latest version via go install.")
 		flagPrefetchWork = flag.Bool("prefetch-worker", false, "Internal: run as prefetch worker.")
 		flagLogRandom    = flag.Bool("log-random", false, "Print a random fortune from the log instead of calling the API.")
 	)
@@ -600,6 +615,11 @@ func main() {
 		provider, model, _, _ := resolveProviderAndModel(*flagProvider, *flagModel, cfg)
 		apiKey, _ := resolveAPIKeyWithSource(*flagAPIKey, provider, cfg)
 		os.Exit(runPrefetchWorker(prompt, apiKey, model, provider))
+	}
+
+	if *flagUpdate {
+		runUpdate()
+		return
 	}
 
 	if *flagStatus {
